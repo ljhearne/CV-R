@@ -1,0 +1,237 @@
+---
+# Some notes:
+# Please see https://github.com/HanZhang-psych/CV
+# - basic information is in the first section and can be updated easily
+# - there are several csv files in the current directory which can be edited / added to, which should update automatically when knitted. E.g., you have to add your presentations to the .csv
+
+## .bib files!
+# - publications are within the "Published.bib" file. This .bib file is exported from orcid. So you may need to update orcid (though it does some things automatically)
+# - preprints are within "Preprints.bib". This .bib file is scraped from google scholar.
+# - datasets and theses were just created manually (given that these rarely update)
+# - all the .bib files are read in as text and then my name is bolded. For the datasets and theses this was done manually
+
+address: Center for Molecular and Behavioral Neuroscience, Rutgers University
+date: "`r format(Sys.time(), '%B %Y')`"
+email: lukehearne@gmail.com
+github: ljhearne
+name: Luke
+output: 
+  vitae::awesomecv:
+    pandoc_args: ["--lua-filter=multiple-bibliographies.lua"] # used for creating bibliographies for multiple sections
+csl: apa-cv.csl # change this if you want to use other citation styles
+phone: +61 4 2492 2254
+position: Postdoctoral researcher
+surname: Hearne
+headcolor: 414141
+twitter: LukeJHearne
+www: luke-hearne.netlify.app
+bibliography_published: "Published.bib"
+bibliography_preprints: "Preprints.bib" 
+bibliography_theses: "Theses.bib" 
+bibliography_data: "Datasets.bib" 
+nocite: '@*' # don't change this if you want to print out all the refs
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(vitae);library(tibble);library(dplyr)
+```
+# Overview
+I am an early career researcher interested in the large-scale functional and structural organization of the brain, and how it relates to cognition and mental health. I use a combination of neuroimaging, computational modeling and network science to investigate these questions.
+
+# Current positions
+```{r current employment}
+emp <- do.call("bind_rows",rorcid::orcid_employments("0000-0002-2014-1148")$`0000-0002-2014-1148`$`affiliation-group`$summaries)
+
+# find NA entries in the year and change to current, and index the entire dataframe
+idx = is.na(emp$`employment-summary.end-date.year.value`)
+emp$`employment-summary.end-date.year.value`[idx] = "Current"
+emp = emp[idx,]
+
+emp %>%
+  detailed_entries(
+    what = `employment-summary.role-title`,
+    when = glue::glue("{`employment-summary.start-date.year.value`} - {`employment-summary.end-date.year.value`}"),
+    with = glue::glue("{`employment-summary.organization.name`}: {`employment-summary.department-name`}"),
+    where = glue::glue("{`employment-summary.organization.address.city`} - {`employment-summary.organization.address.country`}")
+  )
+```
+
+# Previous positions
+```{r previous employment}
+emp <- do.call("bind_rows",rorcid::orcid_employments("0000-0002-2014-1148")$`0000-0002-2014-1148`$`affiliation-group`$summaries)
+
+# find NA entries in the year and change to current, and index the entire dataframe
+idx = is.na(emp$`employment-summary.end-date.year.value`)
+emp = emp[!idx,]
+
+emp %>%
+  detailed_entries(
+    what = `employment-summary.role-title`,
+    when = glue::glue("{`employment-summary.start-date.year.value`} - {`employment-summary.end-date.year.value`}"),
+    with = glue::glue("{`employment-summary.organization.name`}: {`employment-summary.department-name`}"),
+    where = glue::glue("{`employment-summary.organization.address.city`} - {`employment-summary.organization.address.country`}")
+  )
+```
+# Education
+```{r education}
+
+edu <- do.call("bind_rows",
+  rorcid::orcid_educations("0000-0002-2014-1148")$`0000-0002-2014-1148`$`affiliation-group`$summaries
+)
+edu %>%
+  detailed_entries(
+    what = `education-summary.role-title`,
+    when = glue::glue("{`education-summary.start-date.year.value`} - {`education-summary.end-date.year.value`}"),
+    with = glue::glue("{`education-summary.organization.name`}: {`education-summary.department-name`}"),
+    where = `education-summary.organization.address.city`
+  )
+```
+# Publications
+## Peer reviewed
+```{r peer reviewed pubs}
+orcid_id <- c("0000-0002-2014-1148")
+my_dois <- rorcid::identifiers(rorcid::works(orcid_id))
+pubs <- rcrossref::cr_cn(dois = my_dois, format = "bibtex")
+invisible(lapply(pubs, write, "Published.bib", append=TRUE))
+
+raw_text  <- readLines("Published.bib")
+new_text  <- gsub("Luke Hearne", "{\\\\bf Hearne, L. J}", raw_text)
+writeLines(new_text, con="Published.bib")
+
+raw_text  <- readLines("Published.bib")
+new_text  <- gsub("Luke J. Hearne", "{\\\\bf Hearne, L. J}", raw_text)
+writeLines(new_text, con="Published.bib")
+```
+<!-- Notes: copy and paste the following block for any other bibliography sections with the same bibliography key matched that you assigned in YAML  -->
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+::: {#refs_published}
+:::
+
+\endgroup
+<!-- Bib-printing block ends here. -->
+
+## Preprints
+```{r preprint pubs}
+df = scholar::get_publications("sd1s1kAAAAAJ&")
+if (sum(df$journal=="bioRxiv") > 0 || sum(df$journal=="BioRxiv") > 0) {
+  do_preprints=1
+} else {
+  do_preprints=0
+}
+
+if (do_preprints==1) {
+  scholar::get_publications("sd1s1kAAAAAJ&") %>%
+    arrange(desc(year)) %>%
+    filter(grepl('bioRxiv|BioRxiv', journal)) %>%
+    distinct(title, .keep_all = TRUE) %>%
+    transmute(bibtype = "Article", author = as.character(author),
+              title = as.character(title),
+              journaltitle = as.character(journal), year, key = row_number()) %>% 
+    RefManageR::as.BibEntry() %>% 
+    RefManageR::WriteBib("Preprints.bib")
+} else {file.create("Preprints.bib")}
+
+raw_text  <- readLines("Preprints.bib")
+new_text  <- gsub("LJ Hearne", "{\\\\bf Hearne, L. J}", raw_text)
+writeLines(new_text, con="Preprints.bib")
+```
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+::: {#refs_preprints}
+:::
+
+\endgroup
+
+## Theses
+
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+::: {#refs_theses}
+:::
+
+\endgroup
+## Data
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+::: {#refs_data}
+:::
+
+\endgroup
+
+# Funding and awards
+
+## Funding
+```{r}
+library(tibble)
+read.csv('funding_and_awards.csv') %>%
+  arrange(desc(Year)) %>%
+  filter(grepl('Funding', Type)) %>%
+  brief_entries(what=Award,when=Year,with=Desc)
+```
+
+## Awards
+```{r}
+read.csv('funding_and_awards.csv') %>%
+  arrange(desc(Year)) %>%
+  filter(grepl('Award', Type)) %>%
+  brief_entries(what=Award,when=Year,with=Desc)
+```
+# Presentations
+## Invited talks
+```{r}
+
+read.csv('presentations.csv') %>%
+  arrange(desc(Year)) %>%
+  filter(grepl('Invited', Type)) %>%
+  brief_entries(what=glue::glue("{Title}. {Where}"),
+                when=Year)
+```
+## Conference talks
+```{r}
+
+read.csv('presentations.csv') %>%
+  arrange(desc(Year)) %>%
+  filter(grepl('Talk', Type)) %>%
+  brief_entries(what=glue::glue("{Title}. {Where}"),
+                when=Year)
+```
+## Conference posters
+```{r}
+
+read.csv('presentations.csv') %>%
+  filter(grepl('Poster', Type)) %>%
+  brief_entries(what=glue::glue("{Title}. {Where}"),
+                when=Year)
+```
+
+# Teaching, service and public outreach
+
+## Supervision
+```{r}
+read.csv('teaching_supervision.csv') %>%
+brief_entries(what=Description, with=Role,when=Year)
+```
+## Service
+```{r}
+read.csv('service.csv') %>%
+brief_entries(what=Description, with=Role,when=Year)
+```
+
+## Media coverage
+```{r}
+read.csv('media.csv') %>%
+  arrange(desc(Year)) %>%
+  brief_entries(what=TitleLink, when=Year,
+                .protect = FALSE)
+
+```
